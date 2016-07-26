@@ -1,61 +1,75 @@
-package com.qa.tlcask.network;
+package com.foruse.samplecode;
 
 import android.content.Context;
 
-import com.google.android.gms.gcm.GoogleCloudMessaging;
+import com.foruse.samplecode.authentification.LoginResult;
+import com.foruse.samplecode.authentification.PerformForgotPasswordConfirm;
+import com.foruse.samplecode.authentification.RegistrationResult;
+import com.foruse.samplecode.authentification.session.Session;
+import com.foruse.samplecode.authentification.session.SessionManager;
+import com.foruse.samplecode.firebase.IDListenerService;
+import com.foruse.samplecode.main.LoadAlertsResult;
+import com.foruse.samplecode.main.LoadVehicleInfo;
+import com.foruse.samplecode.main.ProfileInfoResult;
+import com.foruse.samplecode.main.QuestionListLoaded;
+import com.foruse.samplecode.main.SubjectListLoaded;
+import com.foruse.samplecode.main.UpdateProfileResult;
+import com.foruse.samplecode.main.UpdateVehicleResult;
+import com.foruse.samplecode.messages.NotificationsLoaded;
+import com.foruse.samplecode.messages.PerformAlertDialog;
+import com.foruse.samplecode.model.Alerts;
+import com.foruse.samplecode.model.Notification;
+import com.foruse.samplecode.model.ProfileInfo;
+import com.foruse.samplecode.model.VehicleInfo;
+import com.foruse.samplecode.network.parsers.ChangePasswordParser;
+import com.foruse.samplecode.network.parsers.ForgotPasswordParser;
+import com.foruse.samplecode.network.parsers.LoadAlertsParser;
+import com.foruse.samplecode.network.parsers.LoadProfileDataParser;
+import com.foruse.samplecode.network.parsers.LoadQuestionParser;
+import com.foruse.samplecode.network.parsers.LoadSubjectsParser;
+import com.foruse.samplecode.network.parsers.LoadVehicleInfoParser;
+import com.foruse.samplecode.network.parsers.LoginParser;
+import com.foruse.samplecode.network.parsers.NotificationParser;
+import com.foruse.samplecode.network.parsers.RegistrationParser;
+import com.foruse.samplecode.network.parsers.UpdateProfileDataParser;
+import com.foruse.samplecode.network.parsers.UpdateVehicleParser;
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.AsyncHttpResponseHandler;
 import com.loopj.android.http.RequestParams;
 import com.loopj.android.http.SyncHttpClient;
-import com.qa.tlcask.R;
-import com.qa.tlcask.authentification.session.Session;
-import com.qa.tlcask.authentification.session.SessionManager;
-import com.qa.tlcask.main.model.Alerts;
-import com.qa.tlcask.main.model.Notification;
-import com.qa.tlcask.main.model.ProfileInfo;
-import com.qa.tlcask.main.model.VehicleInfo;
-import com.qa.tlcask.messages.NotificationsLoaded;
-import com.qa.tlcask.messages.PerformAlertDialog;
-import com.qa.tlcask.messages.authentification.LoginResult;
-import com.qa.tlcask.messages.authentification.PerformForgotPasswordConfirm;
-import com.qa.tlcask.messages.authentification.RegistrationResult;
-import com.qa.tlcask.messages.main.LoadAlertsResult;
-import com.qa.tlcask.messages.main.LoadVehicleInfo;
-import com.qa.tlcask.messages.main.ProfileInfoResult;
-import com.qa.tlcask.messages.main.QuestionListLoaded;
-import com.qa.tlcask.messages.main.SubjectListLoaded;
-import com.qa.tlcask.messages.main.UpdateProfileResult;
-import com.qa.tlcask.messages.main.UpdateVehicleResult;
-import com.qa.tlcask.network.parsers.ChangePasswordParser;
-import com.qa.tlcask.network.parsers.ForgotPasswordParser;
-import com.qa.tlcask.network.parsers.LoadAlertsParser;
-import com.qa.tlcask.network.parsers.LoadProfileDataParser;
-import com.qa.tlcask.network.parsers.LoadQuestionParser;
-import com.qa.tlcask.network.parsers.LoadSubjectsParser;
-import com.qa.tlcask.network.parsers.LoadVehicleInfoParser;
-import com.qa.tlcask.network.parsers.LoginParser;
-import com.qa.tlcask.network.parsers.NotificationParser;
-import com.qa.tlcask.network.parsers.RegistrationParser;
-import com.qa.tlcask.network.parsers.UpdateProfileDataParser;
-import com.qa.tlcask.network.parsers.UpdateVehicleParser;
 
-import org.apache.http.Header;
-
-import java.io.IOException;
+import org.greenrobot.eventbus.EventBus;
 import java.util.List;
-
-import de.greenrobot.event.EventBus;
+import cz.msebera.android.httpclient.Header;
 
 public class NetworkManager {
 
-    //links to web-api
-    private static final String DEV_URL = "http://tlcask.dev.gbksoft.net/";
-    private static final String PRODUCTION_URL = "http://tlcask.com/";
-    private final String API_URL;
+    /** Singleton instance */
+    private static volatile NetworkManager instance;
 
-    public NetworkManager() {
+    /** Link to web API */
+    private final String API_URL = BuildConfig.api_url;
 
-        API_URL = DEV_URL;
+    /**
+     * NetworkManager will be singleton
+     */
+    private NetworkManager() {
+    }
+
+    /**
+     * Method that will return single NetworkManager instance
+     */
+    public static NetworkManager getInstance() {
+        NetworkManager instance = NetworkManager.instance;
+        if (instance == null) {
+            synchronized (NetworkManager.class) {
+                instance = NetworkManager.instance;
+                if (instance == null) {
+                    NetworkManager.instance = instance = new NetworkManager();
+                }
+            }
+        }
+        return instance;
     }
 
     /**
@@ -65,13 +79,9 @@ public class NetworkManager {
      * @param login    login of user
      * @param password password of user
      * @param context  app context.
-     * @return nothing
      */
-
     public void doLoginRequest(String login, String password, final Context context) {
-
-        String urlPart = "login";
-        String url = API_URL + urlPart;
+        String url = API_URL + "login";
         RequestParams params = new RequestParams();
         params.add("username", login);
         params.add("pwd", password);
@@ -81,24 +91,25 @@ public class NetworkManager {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 Session session = new LoginParser().parse(bytes, context);
-
                 if (session != null) {
-
                     SessionManager.putSession(session, context);
                     EventBus.getDefault().post(new LoginResult(LoginResult.RESULT_OK, session));
                 } else {
-
-                    EventBus.getDefault().post(new LoginResult(LoginResult.RESULT_FAILED, session));
+                    EventBus.getDefault().post(new LoginResult(LoginResult.RESULT_FAILED, null));
                 }
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -110,55 +121,55 @@ public class NetworkManager {
      * @param password password of user
      * @param email    email of user
      * @param context  app context.
-     * @return nothing
      */
+    public void doRegistrationRequest(final String login, final String password,
+                                      final String email, final Context context) {
+        new Thread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        String deviceToken = IDListenerService.getInstance().getToken();
+                        String url = API_URL + "register";
 
-    public void doRegistrationRequest(final String login, final String password, final String email, final Context context) {
+                        RequestParams params = new RequestParams();
+                        params.add("username", login);
+                        params.add("pwd", password);
+                        params.add("email", email);
+                        params.add("device_token", deviceToken);
+                        params.add("device", "android");
 
-        new Thread(new Runnable() {
+                        SyncHttpClient client = new SyncHttpClient();
+                        client.post(url, params, new AsyncHttpResponseHandler() {
 
-            @Override
-            public void run() {
-
-                try {
-
-                    String deviceId = GoogleCloudMessaging.getInstance(context).register(context.getResources().getString(R.string.apiKey));
-                    String urlPart = "register";
-                    String url = API_URL + urlPart;
-                    RequestParams params = new RequestParams();
-                    params.add("username", login);
-                    params.add("pwd", password);
-                    params.add("email", email);
-                    params.add("device_token", deviceId);
-                    params.add("device", "android");
-                    SyncHttpClient client = new SyncHttpClient();
-                    client.post(url, params, new AsyncHttpResponseHandler() {
-
-                        @Override
-                        public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
-                            Session session = new RegistrationParser().parse(bytes, context);
-                            if (session != null) {
-
-                                SessionManager.putSession(session, context);
-                                EventBus.getDefault().post(new RegistrationResult(RegistrationResult.RESULT_OK));
-                            } else {
-
-                                EventBus.getDefault().post(new RegistrationResult(RegistrationResult.RESULT_FAILED));
+                            @Override
+                            public void onSuccess(int i, Header[] headers, byte[] bytes) {
+                                Session session = new RegistrationParser().parse(bytes, context);
+                                if (session != null) {
+                                    SessionManager.putSession(session, context);
+                                    EventBus.getDefault().post(
+                                            new RegistrationResult(RegistrationResult.RESULT_OK)
+                                    );
+                                } else {
+                                    EventBus.getDefault().post(
+                                            new RegistrationResult(RegistrationResult.RESULT_FAILED)
+                                    );
+                                }
                             }
-                        }
 
-                        @Override
-                        public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
+                            @Override
+                            public void onFailure(int i, Header[] headers, byte[] bytes,
+                                                  Throwable throwable) {
+                                EventBus.getDefault().post(
+                                        new PerformAlertDialog(
+                                                context.getString(R.string.networkErrorMessage),
+                                                context.getString(R.string.networkErrorTittle)
+                                        )
+                                );
+                            }
 
-                            EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
-                        }
-                    });
-                } catch (IOException e) {
+                        });
+                    }
 
-                    EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
-                }
-            }
         }).start();
     }
 
@@ -170,33 +181,41 @@ public class NetworkManager {
      * @param newPassConfirm confirm new password
      * @param oldPass        old password of user
      * @param context        app context.
-     * @return nothing
      */
+    public void changePassword(String newPass, String newPassConfirm,
+                               String oldPass, final Context context) {
+        String url = API_URL + "change_pwd";
 
-    public void changePassword(final Context context, String newPass, String newPassConfirm, String oldPass) {
-
-        String urlPart = "change_pwd";
-        String url = API_URL + urlPart;
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
-        params.add("oldpwd", oldPass);
-        params.add("newpwd", newPass);
-        params.add("repwd", newPassConfirm);
+        params.add("old_pwd", oldPass);
+        params.add("new_pwd", newPass);
+        params.add("re_pwd", newPassConfirm);
+
         AsyncHttpClient client = new AsyncHttpClient();
         client.post(url, params, new AsyncHttpResponseHandler() {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 if (new ChangePasswordParser().parse(bytes, context))
-                    EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.changePasswordSuccess), context.getString(R.string.changePasswordTittle)));
+                    EventBus.getDefault().post(
+                            new PerformAlertDialog(
+                                    context.getString(R.string.changePasswordSuccess),
+                                    context.getString(R.string.changePasswordTittle)
+                            )
+                    );
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -205,28 +224,31 @@ public class NetworkManager {
      * Response will be re received by EventBus
      *
      * @param context app context.
-     * @return nothing
      */
-
     public void loadSubjects(final Context context) {
-
         SessionManager.getSession(context);
-        String urlPart = "load_subjects";
-        String url = API_URL + urlPart;
+        String url = API_URL + "load_subjects";
         AsyncHttpClient client = new AsyncHttpClient();
+
         client.post(url, new AsyncHttpResponseHandler() {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
-                EventBus.getDefault().post(new SubjectListLoaded(new LoadSubjectsParser().parse(bytes, context)));
+                EventBus.getDefault().post(
+                        new SubjectListLoaded(new LoadSubjectsParser().parse(bytes, context))
+                );
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -235,34 +257,34 @@ public class NetworkManager {
      * Response will be re received by EventBus
      *
      * @param subjectId id of subject
-     * @param context   app context.
-     * @return nothing
+     * @param context   app context
      */
     public void loadQuestions(Integer subjectId, final Context context) {
-
-        String urlPart = "load_questions";
-        String url = API_URL + urlPart;
+        String url = API_URL + "load_questions";
         RequestParams params = new RequestParams();
         params.add("sid", String.valueOf(subjectId));
+
         AsyncHttpClient client = new AsyncHttpClient();
         client.post(url, params, new AsyncHttpResponseHandler() {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
-                EventBus.getDefault().post(new QuestionListLoaded(new LoadQuestionParser().parse(bytes, context)));
-
+                EventBus.getDefault().post(
+                        new QuestionListLoaded(new LoadQuestionParser().parse(bytes, context))
+                );
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
-
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
 
         });
-
     }
 
     /**
@@ -273,17 +295,16 @@ public class NetworkManager {
      * @param subjectID subject of new question
      * @param email     email of user
      * @param context   app context.
-     * @return nothing
      */
+    public void sendNewQuestion(Integer subjectID, String question,
+                                String email, final Context context) {
 
-    public void sendNewQuestion(Integer subjectID, String question, String email, final Context context) {
-
-        String urlPart = "answer";
-        String url = API_URL + urlPart;
+        String url = API_URL + "answer";
         RequestParams params = new RequestParams();
         params.add("sid", String.valueOf(subjectID));
         params.add("question", question);
         params.add("email", email);
+
         AsyncHttpClient client = new AsyncHttpClient();
         client.post(url, params, new AsyncHttpResponseHandler() {
 
@@ -293,9 +314,14 @@ public class NetworkManager {
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -305,13 +331,10 @@ public class NetworkManager {
      *
      * @param email   email of user
      * @param context app context.
-     * @return nothing
      */
-
     public void forgotPassword(String email, final Context context) {
 
-        String urlPart = "forgot_pwd";
-        String url = API_URL + urlPart;
+        String url = API_URL + "forgot_pwd";
         RequestParams params = new RequestParams();
         params.add("email", email);
         AsyncHttpClient client = new AsyncHttpClient();
@@ -319,25 +342,35 @@ public class NetworkManager {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 if (new ForgotPasswordParser().parse(bytes, context))
-                    EventBus.getDefault().post(new PerformForgotPasswordConfirm());
+                    EventBus.getDefault().post(
+                            new PerformForgotPasswordConfirm()
+                    );
                 else
-                    EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.forgotPasswordWrongEmail), context.getString(R.string.forgotDialogTitle)));
+                    EventBus.getDefault().post(
+                            new PerformAlertDialog(
+                                    context.getString(R.string.forgotPasswordWrongEmail),
+                                    context.getString(R.string.forgotDialogTitle)
+                            )
+                    );
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
-    public void updateProfileInfo(final Context context, ProfileInfo profile) {
+    public void updateProfileInfo(ProfileInfo profile, final Context context) {
+        String url = API_URL + "update_vehicle";
 
-        String urlPart = "update_vehicle";
-        String url = API_URL + urlPart;
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         params.add("first_name", profile.getFirstName());
@@ -359,12 +392,12 @@ public class NetworkManager {
         params.add("course_expiration", profile.getDefExpiration());
         params.add("tlc_permit", profile.getTlcPermit());
         params.add("permit_expiration", profile.getTlcPermitExpiration());
+
         AsyncHttpClient client = new AsyncHttpClient();
         client.post(url, params, new AsyncHttpResponseHandler() {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 UpdateProfileResult result = new UpdateProfileResult(
                         new UpdateProfileDataParser().parse(bytes, context) ?
                                 UpdateProfileResult.SUCCESS : UpdateProfileResult.FAILED);
@@ -373,10 +406,15 @@ public class NetworkManager {
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
         });
+
     }
 
     /**
@@ -384,13 +422,9 @@ public class NetworkManager {
      * Response will be re received by EventBus
      *
      * @param context app context.
-     * @return nothing
      */
-
     public void loadProfileInfo(final Context context) {
-
-        String urlPart = "load_profile";
-        String url = API_URL + urlPart;
+        String url = API_URL + "load_profile";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         AsyncHttpClient client = new AsyncHttpClient();
@@ -398,15 +432,18 @@ public class NetworkManager {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 ProfileInfo profile = new LoadProfileDataParser().parse(bytes, context);
                 EventBus.getDefault().post(new ProfileInfoResult(profile));
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
         });
     }
@@ -416,13 +453,9 @@ public class NetworkManager {
      * Response will be re received by EventBus
      *
      * @param context app context.
-     * @return nothing
      */
-
     public void loadVehicleInfo(final Context context) {
-
-        String urlPart = "load_vehicle";
-        String url = API_URL + urlPart;
+        String url = API_URL + "load_vehicle";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         AsyncHttpClient client = new AsyncHttpClient();
@@ -430,16 +463,20 @@ public class NetworkManager {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 VehicleInfo vehicle = new LoadVehicleInfoParser().parse(bytes, context);
                 EventBus.getDefault().post(new LoadVehicleInfo(vehicle));
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -449,12 +486,9 @@ public class NetworkManager {
      *
      * @param vehicle vehicle information
      * @param context app context.
-     * @return nothing
      */
     public void updateVehicleInfoHttpPost(VehicleInfo vehicle, final Context context) {
-
-        String urlPart = "update_vehicle";
-        String url = API_URL + urlPart;
+        String url = API_URL + "update_vehicle";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         params.add("vehicle_vin", vehicle.getVin());
@@ -470,22 +504,30 @@ public class NetworkManager {
         params.add("base_name", vehicle.getBaseName());
         params.add("base_number", vehicle.getBaseNumber());
         params.add("base_address", vehicle.getBaseAddress());
+
         AsyncHttpClient client = new AsyncHttpClient();
         client.post(url, params, new AsyncHttpResponseHandler() {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 Boolean result = new UpdateVehicleParser().parse(bytes, context);
-                EventBus.getDefault().post(new UpdateVehicleResult(result ? UpdateVehicleResult.SUCCESS :
-                        UpdateVehicleResult.FAILED));
+                EventBus.getDefault().post(
+                        new UpdateVehicleResult(
+                                result ? UpdateVehicleResult.SUCCESS : UpdateVehicleResult.FAILED
+                        )
+                );
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -493,13 +535,9 @@ public class NetworkManager {
      * Method that will remove user from server
      *
      * @param context app context.
-     * @return nothing
      */
-
     public void logOut(final Context context) {
-
-        String urlPart = "close_account";
-        String url = API_URL + urlPart;
+        String url = API_URL + "close_account";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         AsyncHttpClient client = new AsyncHttpClient();
@@ -511,9 +549,14 @@ public class NetworkManager {
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -522,17 +565,13 @@ public class NetworkManager {
      *
      * @param alerts  alerts settings
      * @param context app context.
-     * @return nothing
      */
-
-    public void setAlertsState(final Context context, Alerts alerts) {
-
-        String urlPart = "set_alert";
-        String url = API_URL + urlPart;
+    public void setAlertsState(Alerts alerts, final Context context) {
+        String url = API_URL + "set_alert";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
-        params.add("individual", new StringBuilder().append(alerts.getIndividual() ? 1 : 0).toString());
-        params.add("membership", new StringBuilder().append(alerts.getMembership() ? 1 : 0).toString());
+        params.add("individual", Integer.toString(alerts.getIndividual() ? 1 : 0));
+        params.add("membership", Integer.toString(alerts.getMembership() ? 1 : 0));
         AsyncHttpClient client = new AsyncHttpClient();
         client.post(url, params, new AsyncHttpResponseHandler() {
 
@@ -542,9 +581,14 @@ public class NetworkManager {
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -553,12 +597,9 @@ public class NetworkManager {
      * Response will be re received by EventBus
      *
      * @param context app context.
-     * @return nothing
      */
     public void loadAlertsState(final Context context) {
-
-        String urlPart = "get_alert";
-        String url = API_URL + urlPart;
+        String url = API_URL + "get_alert";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         AsyncHttpClient client = new AsyncHttpClient();
@@ -566,29 +607,32 @@ public class NetworkManager {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
-                EventBus.getDefault().post(new LoadAlertsResult(new LoadAlertsParser().parse(bytes, context)));
+                EventBus.getDefault().post(
+                        new LoadAlertsResult(new LoadAlertsParser().parse(bytes, context))
+                );
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
         });
     }
 
     /**
-     * Method that will load notifications from server. in firts step it will load industry notifications after that,
+     * Method that will load notifications from server.
+     * In firsts step it will load industry notifications after that,
      * next step will be loading individual notifications and collect it to List<Notifications>
      * Response will be re received by EventBus
      *
      * @param context app context.
-     * @return nothing
      */
-
     public void loadNotifications(final Context context) {
-
         loadIndustryNotifications(context);
     }
 
@@ -597,13 +641,9 @@ public class NetworkManager {
      * Response will be send to second step
      *
      * @param context app context.
-     * @return nothing
      */
-
     private void loadIndustryNotifications(final Context context) {
-
-        String urlPart = "membership_alerts";
-        String url = API_URL + urlPart;
+        String url = API_URL + "membership_alerts";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         AsyncHttpClient client = new AsyncHttpClient();
@@ -611,15 +651,22 @@ public class NetworkManager {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
-                loadIndividualNotifications(context, new NotificationParser().parse(bytes, context));
+                loadIndividualNotifications(
+                        context,
+                        new NotificationParser().parse(bytes, context)
+                );
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
 
@@ -628,13 +675,10 @@ public class NetworkManager {
      * Response will be re received by EventBus
      *
      * @param context app context.
-     * @return nothing
      */
-
-    private void loadIndividualNotifications(final Context context, final List<Notification> notifications) {
-
-        String urlPart = "individual_alerts";
-        String url = API_URL + urlPart;
+    private void loadIndividualNotifications(final Context context,
+                                             final List<Notification> notifications) {
+        String url = API_URL + "individual_alerts";
         RequestParams params = new RequestParams();
         params.add("token", SessionManager.getSession(context).getToken());
         AsyncHttpClient client = new AsyncHttpClient();
@@ -642,16 +686,21 @@ public class NetworkManager {
 
             @Override
             public void onSuccess(int i, Header[] headers, byte[] bytes) {
-
                 notifications.addAll(new NotificationParser().parse(bytes, context));
                 EventBus.getDefault().post(new NotificationsLoaded(notifications));
             }
 
             @Override
             public void onFailure(int i, Header[] headers, byte[] bytes, Throwable throwable) {
-
-                EventBus.getDefault().post(new PerformAlertDialog(context.getString(R.string.networkErrorMessage), context.getString(R.string.networkErrorTittle)));
+                EventBus.getDefault().post(
+                        new PerformAlertDialog(
+                                context.getString(R.string.networkErrorMessage),
+                                context.getString(R.string.networkErrorTittle)
+                        )
+                );
             }
+
         });
     }
+
 }
