@@ -1,0 +1,15 @@
+{
+    "name": "gbksoft/yii2-sort-order",
+    "description": "Sort order for yii2",
+    "type": "yii2-extension",
+    "keywords": ["yii2", "behavior", "behaviors", "yii2-sort-order", " behaviors", " sort order"],
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "gbksoft\\sortorder\\": "src"
+        }
+    },
+    "require": {
+        "yiisoft/yii2": "*"
+    }
+}
