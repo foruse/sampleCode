@@ -1,0 +1,24 @@
+{
+    "name": "gbksoft/yii2-multilingual",
+    "description": "Multi languages for yii2",
+    "type": "yii2-extension",
+    "keywords": ["yii2", "extension", "yii2-multilingual", " module", " multilingual", " i18"],
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "gbksoft\\multilingual\\": "src"
+        }
+    },
+    "require": {
+        "yiisoft/yii2": "*"
+    },
+    "require-dev": {
+        "yiisoft/yii2-codeception": "*",
+        "yiisoft/yii2-faker": "*",
+        "codeception/codeception": "2.0.*",
+        "codeception/specify": "*",
+        "codeception/verify": "*",
+        "flow/jsonpath": "*",
+        "andres-montanez/magallanes": "~1.0.1"
+    }
+}
