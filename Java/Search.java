@@ -1,4 +1,4 @@
-package com.spot101.industryevents.events.list.presenter.model;
+package com.example.events.list.presenter.model;
 
 import android.content.Context;
 import android.text.TextUtils;
