@@ -1,4 +1,4 @@
-package com.spot101.industryevents.events.list;
+package com.example.events.list;
 
 import android.Manifest;
 import android.app.Activity;
